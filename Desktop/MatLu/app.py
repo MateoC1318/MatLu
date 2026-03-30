@@ -1,44 +1,67 @@
 import streamlit as st
 
-st.set_page_config(page_title="MatLu - Análisis de Riesgo", page_icon="📈")
+st.set_page_config(page_title="MatLu - Gestión de Riesgo", page_icon="📈")
 
-st.title("🩺 MatLu: Diagnóstico de Inversión")
-st.write("Calcula la 'dosis' exacta para tus operaciones en Polymarket o Kalshi.")
+st.title("🛡️ MatLu: Terminal de Inversión")
+st.markdown("---")
 
-# --- PANEL LATERAL ---
-with st.sidebar:
-    st.header("Configuración")
-    capital_total = st.number_input("Tu Capital Total (USD)", value=100.0)
-    fraccion_kelly = st.slider("Nivel de Riesgo (Fracción de Kelly)", 0.1, 1.0, 0.25)
+# --- SECCIÓN 1: CRITERIO DE KELLY ---
+st.header("1. ¿Cuánto invertir? (Criterio de Kelly)")
 
-# --- ENTRADA DE DATOS (MÉTODO MANUAL) ---
-st.subheader("Datos del Mercado")
 col1, col2 = st.columns(2)
 
 with col1:
-    evento = st.text_input("Nombre del Evento", "NBA: Philadelphia vs Miami")
-    precio_si = st.number_input("Precio del 'SÍ' (en centavos)", min_value=1, max_value=99, value=45)
+    capital_total = st.number_input("Tu Capital Total (COP)", min_value=0, value=1000000, step=50000)
+    precio_kelly = st.number_input("Precio Escalado (Ej: 27.6 para Ecopetrol)", min_value=0.1, max_value=99.0, value=27.6)
 
 with col2:
-    tu_probabilidad = st.number_input("Tu Probabilidad Estimada (%)", min_value=1, max_value=99, value=55)
+    probabilidad = st.slider("Tu Probabilidad de Éxito (%)", 0, 100, 60)
+    fraccion_kelly = st.select_slider("Fracción de Kelly (Riesgo)", options=[0.1, 0.25, 0.5, 1.0], value=0.25)
 
-# --- CÁLCULOS MATEMÁTICOS ---
-p = tu_probabilidad / 100
+# Cálculo de Kelly
+p = probabilidad / 100
 q = 1 - p
-b = (100 - precio_si) / precio_si  # Cuánto ganas por cada dólar invertido
+b = (100 - precio_kelly) / precio_kelly
 
-# Criterio de Kelly
-f_kelly = (p * b - q) / b
-sugerencia_dinero = f_kelly * capital_total * fraccion_kelly
-
-# --- RESULTADOS ---
-st.divider()
-if f_kelly > 0:
-    st.success(f"✅ ¡Oportunidad detectada en {evento}!")
-    st.metric("Inversión Recomendada", f"${max(0, sugerencia_dinero):.2f} USD")
-    st.write(f"Tu ventaja sobre el mercado es del **{((p - (precio_si/100))*100):.1f}%**")
+if b > 0:
+    f_kelly = (p * b - q) / b
+    inversion_sugerida = capital_total * f_kelly * fraccion_kelly
 else:
-    st.error("❌ No invertir. El precio es muy alto para tu probabilidad.")
-    st.write("La matemática no favorece esta operación en este momento.")
+    f_kelly = 0
+    inversion_sugerida = 0
 
-st.info("Nota: Si el precio es 45¢ y tú crees que la probabilidad es 55%, el sistema te dirá cuánto apostar.")
+if inversion_sugerida > 0:
+    st.success(f"✅ Inversión Sugerida: **${inversion_sugerida:,.0f} COP**")
+else:
+    st.error("❌ No invertir: El precio es muy alto para tu probabilidad.")
+
+st.markdown("---")
+
+# --- SECCIÓN 2: CALCULADORA DE GANANCIA NETA ---
+st.header("2. Proyección de Ganancia Real")
+
+c1, c2 = st.columns(2)
+
+with c1:
+    p_compra = st.number_input("Precio de Compra Real (Ej: 2760)", min_value=0, value=2760)
+    monto_pago = st.number_input("Monto a invertir ($)", min_value=0, value=int(inversion_sugerida) if inversion_sugerida > 0 else 50000)
+
+with c2:
+    p_venta = st.number_input("Precio de Venta Objetivo (Ej: 3000)", min_value=0, value=3000)
+    comision_fija = st.number_input("Comisión de la App (COP)", min_value=0, value=10000)
+
+# Cálculos de Ganancia
+pct_cambio = ((p_venta - p_compra) / p_compra) * 100
+ganancia_bruta = (monto_pago / p_compra) * (p_venta - p_compra)
+ganancia_neta = ganancia_bruta - (comision_fija * 2) # Compra y Venta
+
+st.subheader("Resultado del Diagnóstico:")
+
+if ganancia_neta > 0:
+    st.info(f"Subida esperada: **{pct_cambio:.2f}%**")
+    st.success(f"Ganancia Neta Estimada: **${ganancia_neta:,.0f} COP** (restando comisiones)")
+else:
+    st.warning(f"Atención: Con una subida del {pct_cambio:.2f}%, las comisiones se comen tu ganancia. Quedarías con: **${ganancia_neta:,.0f} COP**")
+
+st.markdown("---")
+st.caption("MatLu v2.0 - Herramienta de apoyo para la toma de decisiones financieras.")
