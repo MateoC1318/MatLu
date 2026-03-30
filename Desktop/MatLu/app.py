@@ -1,81 +1,69 @@
 import streamlit as st
 
-st.set_page_config(page_title="MatLu v4.0 - Gestión de Riesgo", page_icon="⚖️")
+st.set_page_config(page_title="MatLu v6.0 - Centro de Mando", page_icon="📈")
 
-st.title("⚖️ MatLu: Gestión de Capital (Estilo Polymarket)")
+st.title("📈 MatLu: Inteligencia & Gestión de Riesgo")
 st.markdown("---")
 
-# --- 1. DIAGNÓSTICO DE PROBABILIDAD ---
-st.header("1. Cálculo de Probabilidad (Win Rate)")
-col_a, col_b = st.columns(2)
+# --- SECCIÓN 1: PREDICCIÓN AUTOMÁTICA (EL ADIVINO) ---
+st.header("1. 🧠 Diagnóstico de Probabilidad (Predictor)")
+st.info("Usa esta sección para que MatLu analice la tendencia por ti.")
 
-with col_a:
-    p_actual = st.number_input("Precio Actual de la Acción/Activo", value=2760.0)
-    p_anterior = st.number_input("Precio de Referencia (Hace 7-30 días)", value=2650.0)
+col1, col2 = st.columns(2)
+with col1:
+    p_hoy = st.number_input("Precio Actual (Ej: 2760)", value=2760.0, key="p1")
+    p_pasado = st.number_input("Precio hace 1 semana", value=2650.0, key="p2")
+with col2:
+    animo = st.select_slider("Sentimiento del Mercado", 
+                             options=["Baja", "Neutral", "Alta"], value="Neutral")
 
-with col_b:
-    sentimiento = st.select_slider("Sentimiento del Mercado", 
-                                   options=["Pesimista", "Neutral", "Optimista"], 
-                                   value="Neutral")
+# Lógica del Predictor
+cambio_pct = ((p_hoy - p_pasado) / p_pasado) * 100
+prob_auto = 52.0
+if cambio_pct > 0: prob_auto += min(cambio_pct * 1.5, 15)
+else: prob_auto -= min(abs(cambio_pct) * 2, 20)
+if animo == "Alta": prob_auto += 5
+if animo == "Baja": prob_auto -= 10
+prob_auto = max(min(prob_auto, 85), 15)
 
-# Lógica de Probabilidad Predictiva
-cambio = ((p_actual - p_anterior) / p_anterior) * 100
-prob_final = 52.0  # Base conservadora
-
-if cambio > 0:
-    prob_final += min(cambio * 1.5, 15)  # Suma por tendencia alcista
-else:
-    prob_final -= min(abs(cambio) * 2, 20)  # Resta por tendencia bajista
-
-if sentimiento == "Optimista": prob_final += 5
-if sentimiento == "Pesimista": prob_final -= 10
-
-# Limites de seguridad
-prob_final = max(min(prob_final, 85), 10)
-
-st.metric("Tu Probabilidad de Éxito", f"{prob_final:.1f}%", f"{cambio:.2f}% tendencia")
+st.metric("Probabilidad Sugerida", f"{prob_auto:.1f}%", f"{cambio_pct:.2f}% de tendencia")
 
 st.markdown("---")
 
-# --- 2. DOSIS DE INVERSIÓN (ESTILO POLYMARKET / KALSHI) ---
-st.header("2. Dosis Sugerida (% del Capital)")
+# --- SECCIÓN 2: ENTRADA MANUAL (ESTILO POLYMARKET) ---
+st.header("2. 🎯 Dosis por Probabilidad Directa")
+st.info("Usa esta sección si ya tienes un porcentaje de Polymarket o Kalshi.")
 
 c1, c2 = st.columns(2)
-
 with c1:
-    # Si la acción vale 2760, usamos 27.6 como 'precio de contrato' para la fórmula
-    precio_contrato = st.number_input("Precio del Contrato (Escala 1-100)", value=27.6)
-    capital_total = st.number_input("Tu Capital Total (Opcional)", value=1000000)
-
+    # AQUÍ COLOCAS LO QUE ESTÁS VIENDO EN LA OTRA APP
+    prob_manual = st.number_input("Probabilidad que estás viendo (%)", 
+                                  min_value=1.0, max_value=99.0, value=prob_auto, step=1.0)
+    capital = st.number_input("Tu Capital Total", value=1000000, step=50000)
 with c2:
-    # Forzamos fracción conservadora para no perder
-    fraccion = st.radio("Nivel de Conservadurismo", [0.1, 0.2], 
+    precio_con = st.number_input("Precio del Contrato (Escala 1-100)", 
+                                 min_value=1.0, max_value=99.0, value=50.0)
+    riesgo_k = st.radio("Nivel de Conservadurismo", [0.1, 0.2], 
                         format_func=lambda x: "Muy Conservador (0.1)" if x==0.1 else "Moderado (0.2)")
 
-# CÁLCULO DE KELLY PARA PORCENTAJE
-p = prob_final / 100
+# Cálculo de Dosis Final (Kelly)
+p = prob_manual / 100
 q = 1 - p
-b = (100 - precio_contrato) / precio_contrato if precio_contrato < 100 else 0
+b_val = (100 - precio_con) / precio_con if precio_con < 100 else 0
 
-if b > 0:
-    # Calculamos el % de Kelly y lo multiplicamos por la fracción de seguridad
-    porcentaje_kelly = ((p * b - q) / b) * fraccion
+if b_val > 0:
+    f_k = ((p * b_val) - q) / b_val
+    dosis_pct = max(0, f_k * riesgo_k * 100)
 else:
-    porcentaje_kelly = 0
+    dosis_pct = 0
 
-# RESULTADO FINAL
-st.subheader("Resultado del Análisis:")
-
-if porcentaje_kelly > 0:
-    porcentaje_final = porcentaje_kelly * 100
-    monto_pesos = capital_total * porcentaje_kelly
-    
-    st.success(f"### 📈 Dosis Sugerida: {porcentaje_final:.2f}% de tu capital")
-    st.write(f"Si tu capital es **${capital_total:,.0f}**, invierte: **${monto_pesos:,.0f}**")
-    st.info("Este porcentaje te permite ganar sin arriesgar tu estabilidad financiera.")
+# --- RESULTADO FINAL ---
+if dosis_pct > 0:
+    monto_final = capital * (dosis_pct / 100)
+    st.success(f"### ✅ DOSIS SUGERIDA: {dosis_pct:.2f}%")
+    st.metric("Inversión en Pesos/Dólares", f"${monto_final:,.0f}")
 else:
-    st.error("### 🛑 No Invertir")
-    st.write("La probabilidad es muy baja o el precio está muy caro según este modelo.")
+    st.error("🛑 No es seguro invertir con estos datos.")
 
 st.markdown("---")
-st.caption("MatLu v4.0 - Gestión de riesgo profesional y conservadora.")
+st.caption("MatLu v6.0 - Combinando predicción y gestión manual.")
