@@ -1,46 +1,59 @@
 import streamlit as st
 
-st.title("🧠 MatLu: Predictor de Probabilidades")
+st.set_page_config(page_title="MatLu v3.0 - Escudo Financiero", page_icon="🛡️")
 
-# --- SECCIÓN DE PREDICCIÓN (EL "OJO" DE LA APP) ---
-st.header("1. Diagnóstico de Tendencia")
-st.info("Ingresa los datos de la gráfica de trii para que MatLu calcule la probabilidad.")
+st.title("🛡️ MatLu: Terminal Conservadora")
+st.markdown("---")
 
+# --- 1. PREDICCIÓN BASADA EN DATOS ---
+st.header("1. Diagnóstico de Estabilidad")
 col_a, col_b = st.columns(2)
+
 with col_a:
-    precio_actual = st.number_input("Precio Actual (Ej: 2760)", value=2760)
-    precio_hace_una_semana = st.number_input("Precio hace 7 días", value=2600)
+    p_actual = st.number_input("Precio Actual (Ej: VOO a 470)", value=470.0)
+    p_antes = st.number_input("Precio hace 1 mes", value=450.0)
 
 with col_b:
-    tendencia_noticias = st.select_slider("Sentimiento del Mercado/Noticias", 
-                                          options=["Muy Malo", "Bajista", "Neutral", "Alcista", "Excelente"], 
-                                          value="Neutral")
+    noticias = st.select_slider("Sentimiento Global", 
+                               options=["Pesimista", "Cauteloso", "Neutral", "Optimista"], 
+                               value="Neutral")
 
-# LÓGICA DE PREDICCIÓN AUTOMÁTICA
-# Si el precio actual es mayor al de hace una semana, la probabilidad sube
-cambio_precio = ((precio_actual - precio_hace_una_semana) / precio_hace_una_semana) * 100
+# Lógica Conservadora
+cambio = ((p_actual - p_antes) / p_antes) * 100
+prob_base = 52 # Empezamos casi en 50/50 por prudencia
+if cambio > 0: prob_base += min(cambio, 10)
+if noticias == "Optimista": prob_base += 5
+if noticias == "Pesimista": prob_base -= 10
 
-# Base de probabilidad
-prob_calculada = 50 
-
-# Ajuste por tendencia de precio
-if cambio_precio > 0:
-    prob_calculada += min(cambio_precio * 2, 20) # Sube hasta 20% más si va al alza
-else:
-    prob_calculada -= min(abs(cambio_precio) * 2, 20)
-
-# Ajuste por noticias
-ajuste_noticias = {"Muy Malo": -20, "Bajista": -10, "Neutral": 0, "Alcista": 10, "Excelente": 20}
-prob_calculada += ajuste_noticias[tendencia_noticias]
-
-# Limitar entre 0 y 100
-prob_calculada = max(min(prob_calculada, 95), 5)
-
-st.metric(label="Probabilidad Predicha por MatLu", value=f"{prob_calculada:.0f}%", delta=f"{cambio_precio:.2f}% de tendencia")
+st.metric("Probabilidad Conservadora", f"{prob_base:.1f}%", f"{cambio:.2f}% tendencia")
 
 st.markdown("---")
 
-# --- EL RESTO DE TU CALCULADORA DE KELLY ---
-# (Usa el valor de 'prob_calculada' automáticamente)
-st.write(f"Utilizando **{prob_calculada:.0f}%** para calcular tu inversión de Kelly...")
-# ... aquí seguiría el código de Kelly usando esa variable
+# --- 2. GESTIÓN DE RIESGO (KELLY) ---
+st.header("2. Dosis de Inversión Sugerida")
+c1, c2 = st.columns(2)
+
+with c1:
+    capital = st.number_input("Capital Total (COP o USD)", value=1000000)
+    # Escalamos el precio para la fórmula
+    precio_escala = st.number_input("Precio para Fórmula (1-99)", value=47.0)
+
+with c2:
+    # Bloqueamos el riesgo a niveles bajos para proteger al usuario
+    riesgo = st.select_slider("Nivel de Riesgo (Fracción Kelly)", options=[0.1, 0.2], value=0.1)
+
+# Cálculo Kelly
+p = prob_base / 100
+q = 1 - p
+b = (100 - precio_escala) / precio_escala
+f_k = (p * b - q) / b if b > 0 else 0
+sugerencia = max(0, capital * f_k * riesgo)
+
+if sugerencia > 0:
+    st.success(f"✅ Invierte máximo: **{sugerencia:,.0f}**")
+    st.info("Esta dosis protege tu capital contra caídas inesperadas.")
+else:
+    st.error("❌ No invertir: El riesgo es muy alto para un perfil conservador.")
+
+st.markdown("---")
+st.caption("MatLu v3.0 - Priorizando la preservación del capital.")
