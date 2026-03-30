@@ -1,70 +1,44 @@
 import streamlit as st
-import requests
-import pandas as pd
 
-# --- CONFIGURACIÓN DE LA PÁGINA ---
-st.set_page_config(page_title="MatLu - Análisis de Riesgo Kalshi", layout="wide")
-st.title("📊 MatLu: Monitor de Inversión Segura")
-st.markdown("---")
+st.set_page_config(page_title="MatLu - Análisis de Riesgo", page_icon="📈")
 
-# --- PARÁMETROS DE SEGURIDAD ---
-MARGEN_SEGURIDAD = 0.15  # 15% de ventaja sobre el mercado
-FRACCION_KELLY = 0.10    # Solo arriesgar el 10% de lo que sugiera Kelly
+st.title("🩺 MatLu: Diagnóstico de Inversión")
+st.write("Calcula la 'dosis' exacta para tus operaciones en Polymarket o Kalshi.")
 
-# --- LÓGICA DEL ALGORITMO ---
-def analizar_inversion(prob_real, precio_k, capital):
-    b = (1.0 / precio_k) - 1  # Ganancia neta
-    p = prob_real
-    q = 1 - p
-    
-    # Filtro 1: Margen de Ventaja
-    if p < (precio_k + MARGEN_SEGURIDAD):
-        return "🔴 NO INVERTIR: Margen de seguridad insuficiente.", 0, "Bajo"
-    
-    # Filtro 2: Valor Esperado
-    ev = (p * b) - q
-    if ev <= 0:
-        return "🟡 ESPERAR: Riesgo matemático detectado.", 0, "Neutro"
-    
-    # Filtro 3: Cálculo de inversión (Kelly Conservador)
-    f_kelly = ((b * p) - q) / b
-    monto = capital * (f_kelly * FRACCION_KELLY)
-    
-    return "🟢 INVERSIÓN SEGURA", round(monto, 2), "Alto"
+# --- PANEL LATERAL ---
+with st.sidebar:
+    st.header("Configuración")
+    capital_total = st.number_input("Tu Capital Total (USD)", value=100.0)
+    fraccion_kelly = st.slider("Nivel de Riesgo (Fracción de Kelly)", 0.1, 1.0, 0.25)
 
-# --- INTERFAZ DE USUARIO ---
+# --- ENTRADA DE DATOS (MÉTODO MANUAL) ---
+st.subheader("Datos del Mercado")
 col1, col2 = st.columns(2)
 
 with col1:
-    st.subheader("Configuración de Mercado")
-    capital = st.number_input("Tu Capital Total ($)", value=1000)
-    precio_mercado = st.slider("Precio en Kalshi (centavos)", 0.01, 0.99, 0.65)
-    st.info(f"El mercado cree que hay un {int(precio_mercado*100)}% de probabilidad.")
+    evento = st.text_input("Nombre del Evento", "NBA: Philadelphia vs Miami")
+    precio_si = st.number_input("Precio del 'SÍ' (en centavos)", min_value=1, max_value=99, value=45)
 
 with col2:
-    st.subheader("Análisis de Datos Externos")
-    prob_externa = st.slider("Tu Probabilidad (basada en FRED/Datos)", 0.01, 0.99, 0.85)
-    st.write(f"Tu análisis sugiere un {int(prob_externa*100)}% de probabilidad.")
+    tu_probabilidad = st.number_input("Tu Probabilidad Estimada (%)", min_value=1, max_value=99, value=55)
 
-# --- RESULTADO ---
-st.markdown("### Resultado del Análisis")
-status, monto_sugerido, nivel = analizar_inversion(prob_externa, precio_mercado, capital)
+# --- CÁLCULOS MATEMÁTICOS ---
+p = tu_probabilidad / 100
+q = 1 - p
+b = (100 - precio_si) / precio_si  # Cuánto ganas por cada dólar invertido
 
-if "🟢" in status:
-    st.success(f"**{status}**")
-    st.metric("Inversión Sugerida", f"${monto_sugerido}")
-    st.warning(f"Regla de oro: No exceder el 2% de tu capital total por evento.")
+# Criterio de Kelly
+f_kelly = (p * b - q) / b
+sugerencia_dinero = f_kelly * capital_total * fraccion_kelly
+
+# --- RESULTADOS ---
+st.divider()
+if f_kelly > 0:
+    st.success(f"✅ ¡Oportunidad detectada en {evento}!")
+    st.metric("Inversión Recomendada", f"${max(0, sugerencia_dinero):.2f} USD")
+    st.write(f"Tu ventaja sobre el mercado es del **{((p - (precio_si/100))*100):.1f}%**")
 else:
-    st.error(status)
+    st.error("❌ No invertir. El precio es muy alto para tu probabilidad.")
+    st.write("La matemática no favorece esta operación en este momento.")
 
-# Historial de simulación (Para tu semana de prueba)
-st.markdown("---")
-st.subheader("📝 Registro de Simulación de la Semana")
-if 'historial' not in st.session_state:
-    st.session_state.historial = []
-
-if st.button("Registrar esta operación para seguimiento"):
-    st.session_state.historial.append({"Precio": precio_mercado, "Prob": prob_externa, "Decisión": status})
-    st.write("Operación guardada localmente.")
-
-st.table(pd.DataFrame(st.session_state.historial))
+st.info("Nota: Si el precio es 45¢ y tú crees que la probabilidad es 55%, el sistema te dirá cuánto apostar.")
